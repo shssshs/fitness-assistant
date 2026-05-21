@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>💪 小虾健身助手</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-light: #818CF8;
+      --success: #10B981;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --bg: #F8FAFC;
+      --card: #FFFFFF;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); color: var(--text); }
+    .container { max-width: 768px; margin: 0 auto; padding: 16px; }
+    
+    /* 头部 */
+    header { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 24px 16px; border-radius: 0 0 24px 24px; margin-bottom: 24px; }
+    header h1 { font-size: 22px; font-weight: 700; }
+    header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+    
+    /* 统计卡片 */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: var(--card); border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .stat-card .value { font-size: 28px; font-weight: 800; color: var(--primary); }
+    .stat-card .label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-card.streak .value { color: var(--success); }
+    .stat-card.today .value { color: var(--warning); }
+    
+    /* 加载状态 */
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+    .error-msg { background: #FEE2E2; color: var(--danger); padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; font-size: 14px; }
+    
+    /* Tab 导航 */
+    .tabs { display: flex; background: var(--card); border-radius: 12px; padding: 4px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .tab { flex: 1; text-align: center; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
+    .tab.active { background: var(--primary); color: white; }
+    
+    /* 内容区 */
+    .content { display: none; }
+    .content.active { display: block; }
+    
+    /* 训练日卡片 */
+    .day-card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-left: 4px solid var(--primary); }
+    .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .day-name { font-weight: 700; font-size: 15px; }
+    .day-badge { background: #EEF2FF; color: var(--primary); font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+    .day-badge.done { background: #D1FAE5; color: var(--success); }
+    .day-focus { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+    
+    /* 动作列表 */
+    .exercise-item { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .exercise-item:last-child { border-bottom: none; }
+    .exercise-num { width: 24px; height: 24px; background: #EEF2FF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--primary); margin-right: 10px; flex-shrink: 0; }
+    .exercise-info { flex: 1; }
+    .exercise-name { font-size: 14px; font-weight: 500; }
+    .exercise-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .exercise-sets { font-size: 12px; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+    
+    /* 打卡按钮 */
+    .checkin-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 12px; transition: all 0.2s; }
+    .checkin-btn.do { background: var(--primary); color: white; }
+    .checkin-btn.do:hover { background: #4338CA; }
+    .checkin-btn.done { background: var(--success); color: white; }
+    
+    /* 动作库 */
+    .ex-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+    .ex-card { background: var(--card); border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; transition: all 0.2s; }
+    .ex-card:hover { box-shadow: 0 4px 12px rgba(79,70,229,0.15); transform: translateY(-1px); }
+    .ex-card-name { font-size: 13px; font-weight: 600; }
+    .ex-card-cat { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    .ex-card-cat span { background: #EEF2FF; color: var(--primary); padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+    
+    /* 动作详情弹窗 */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+    .modal-overlay.hidden { display: none; }
+    .modal { background: white; border-radius: 20px; width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto; padding: 24px; }
+    .modal h3 { font-size: 18px; margin-bottom: 4px; }
+    .modal-tag { display: inline-block; background: #EEF2FF; color: var(--primary); font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; margin-bottom: 12px; }
+    .modal-section { margin-top: 16px; }
+    .modal-section h4 { font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+    .modal-section p { font-size: 14px; line-height: 1.6; }
+    .modal-tip { background: #FEF3C7; padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+    .modal-close { width: 100%; margin-top: 20px; padding: 12px; border: none; background: var(--bg); border-radius: 10px; font-size: 14px; cursor: pointer; font-weight: 500; }
+    
+    /* 打卡历史 */
+    .history-item { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .history-date { font-size: 14px; font-weight: 600; }
+    .history-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .history-check { color: var(--success); font-weight: 700; font-size: 13px; }
+    
+    /* 空状态 */
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+    .empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* 底部留白 */
+    .bottom-spacer { height: 32px; }
+  </style>
+</head>
+<body>
+
+<!-- 密码门禁 -->
+<div id="gate" style="position:fixed;inset:0;background:linear-gradient(135deg,#4F46E5,#818CF8);display:flex;align-items:center;justify-content:center;z-index:999;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <div style="background:white;border-radius:24px;padding:40px 32px;width:min(360px,90vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+    <div style="font-size:48px;margin-bottom:12px;">💪</div>
+    <h2 style="font-size:18px;font-weight:700;color:#1E293B;margin-bottom:6px;">小虾健身助手</h2>
+    <p style="font-size:13px;color:#64748B;margin-bottom:28px;">请输入访问密码</p>
+    <input id="gate-input" type="password" placeholder="请输入密码"
+      onkeydown="if(event.key==='Enter')checkGate()"
+      style="width:100%;padding:12px 16px;border:2px solid #E2E8F0;border-radius:12px;font-size:15px;outline:none;box-sizing:border-box;"
+      onfocus="this.style.borderColor='#4F46E5'"
+      onblur="this.style.borderColor='#E2E8F0'">
+    <div id="gate-error" style="color:#EF4444;font-size:13px;margin-top:8px;min-height:20px;"></div>
+    <button onclick="checkGate()"
+      style="margin-top:16px;width:100%;padding:13px;border:none;border-radius:12px;background:#4F46E5;color:white;font-size:15px;font-weight:700;cursor:pointer;">
+      进入
+    </button>
+  </div>
+</div>
+
+<header>
+  <h1>💪 小虾健身助手</h1>
+  <p id="welcome">正在加载...</p>
+</header>
+
+<div class="container">
+  <!-- 统计区 -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card streak">
+      <div class="value" id="stat-streak">--</div>
+      <div class="label">连续打卡</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="stat-total">--</div>
+      <div class="label">总训练次</div>
+    </div>
+    <div class="stat-card today">
+      <div class="value" id="stat-week">--</div>
+      <div class="label">本周进度</div>
+    </div>
+  </div>
+
+  <!-- 错误提示 -->
+  <div class="error-msg hidden" id="error-box"></div>
+
+  <!-- Tab -->
+  <div class="tabs">
+    <div class="tab active" data-tab="plan">📋 训练计划</div>
+    <div class="tab" data-tab="library">📚 动作库</div>
+    <div class="tab" data-tab="history">📊 打卡记录</div>
+  </div>
+
+  <!-- 训练计划 -->
+  <div class="content active" id="tab-plan"></div>
+
+  <!-- 动作库 -->
+  <div class="content" id="tab-library"></div>
+
+  <!-- 打卡记录 -->
+  <div class="content" id="tab-history"></div>
+
+  <div class="bottom-spacer"></div>
+</div>
+
+<!-- 动作详情弹窗 -->
+<div class="modal-overlay hidden" id="modal">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+// ==================== 密码门禁 ====================
+const GATE_PASS = 'fitness515710';
+function checkGate() {
+  const input = document.getElementById('gate-input');
+  const err = document.getElementById('gate-error');
+  if (input.value === GATE_PASS) {
+    document.getElementById('gate').style.display = 'none';
+  } else {
+    err.textContent = '密码错误，请重新输入';
+    input.value = '';
+    input.focus();
+  }
+}
+// ==================== 配置区 ====================
+// ⚠️ 请将以下 BIN_ID 替换为初始化后返回的 ID
+const CONFIG = {
+  exercisesBinId: '6a0f2fc26610dd3ae882182e',
+  plansBinId: '6a0f2fdb6877513b27ad8ed9',
+  checkinsBinId: '6a0f2fdc6877513b27ad8eda',
+};
+const API_BASE = 'https://api.jsonbin.io/v3/b';
+const KEY_HEADER = { 'X-Access-Key': '$2a$10$V8nEJvPNYgQExi/LbCnwnO3lTN1pTTo19C18kRnA/N1VE8W9xuw1W' };
+
+// ==================== 全局状态 ====================
+let exercises = [];
+let currentPlan = null;
+let checkins = [];
+let binIds = {};
+
+// ==================== API 封装 ====================
+async function fetchBin(binId) {
+  const res = await fetch(`${API_BASE}/${binId}`, { headers: KEY_HEADER });
+  if (!res.ok) throw new Error(`读取失败: ${res.status}`);
+  const data = await res.json();
+  return data.record;
+}
+
+async function saveBin(binId, data) {
+  const res = await fetch(`${API_BASE}/${binId}`, {
+    method: 'PUT',
+    headers: { ...KEY_HEADER, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`保存失败: ${res.status}`);
+  return await res.json();
+}
+
+// ==================== 数据加载 ====================
+async function loadAll() {
+  try {
+    exercises = await fetchBin(CONFIG.exercisesBinId);
+    currentPlan = await fetchBin(CONFIG.plansBinId);
+    const rawCheckins = await fetchBin(CONFIG.checkinsBinId) || [];
+    // 兼容 {checkins:[]} 或纯数组格式
+    checkins = Array.isArray(rawCheckins) ? rawCheckins
+         : (Array.isArray(rawCheckins.checkins) ? rawCheckins.checkins : []);
+    renderAll();
+  } catch (e) {
+    showError('数据加载失败，请检查网络或 API Key 配置。错误: ' + e.message);
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-box');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+// ==================== 统计计算 ====================
+function calcStats() {
+  const today = new Date().toISOString().split('T')[0];
+  const todayDone = checkins.some(c => c.date === today);
+  const todayWeekday = '周' + ['一','二','三','四','五','六','日'][new Date().getDay() - 1];
+  
+  // streak
+  const dates = [...new Set(checkins.map(c => c.date))].sort().reverse();
+  let streak = 0;
+  let d = new Date();
+  while (true) {
+    const ds = d.toISOString().split('T')[0];
+    if (dates.includes(ds)) { streak++; d.setDate(d.getDate() - 1); }
+    else break;
+  }
+  
+  // 本周进度
+  const weekDays = (currentPlan?.days || []).map(day => day.weekday);
+  const thisWeekCheckins = checkins.filter(c => c.weekday && weekDays.includes(c.weekday))
+    .filter(c => {
+      const cw = new Date(c.date + 'T00:00:00').getDay();
+      const todayDow = new Date().getDay();
+      const diff = (new Date() - new Date(c.date + 'T00:00:00')) / 86400000;
+      return diff < 7;
+    });
+  
+  return { streak, total: checkins.length, todayDone, weekDone: thisWeekCheckins.length, weekTarget: weekDays.length };
+}
+
+// ==================== 渲染 ====================
+function renderAll() {
+  renderStats();
+  renderPlan();
+  renderLibrary();
+  renderHistory();
+}
+
+function renderStats() {
+  const s = calcStats();
+  document.getElementById('stat-streak').textContent = s.streak;
+  document.getElementById('stat-total').textContent = s.total;
+  document.getElementById('stat-week').textContent = `${s.weekDone}/${s.weekTarget}`;
+  const welcome = document.getElementById('welcome');
+  if (currentPlan?.user) {
+    welcome.textContent = `${currentPlan.user.name} · 第${currentPlan.user.current_week}周 · ${currentPlan.focus}`;
+  }
+}
+
+function renderPlan() {
+  const container = document.getElementById('tab-plan');
+  const today = new Date().toISOString().split('T')[0];
+  const todayWeekday = '周' + ['一','二','三','四','五','六','日'][new Date().getDay() - 1];
+  
+  if (!currentPlan?.days?.length) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">🏋️</div><p>暂无训练计划</p></div>';
+    return;
+  }
+  
+  const exMap = {};
+  exercises.forEach(ex => exMap[ex.id] = ex);
+  
+  let html = '';
+  for (const day of currentPlan.days) {
+    const isToday = day.weekday === todayWeekday;
+    const checked = checkins.some(c => c.date === today && c.day_id === day.day);
+    const isFuture = !isToday && !checked;
+    
+    html += `<div class="day-card" id="day-${day.day}">
+      <div class="day-header">
+        <div>
+          <div class="day-name">${day.weekday} · ${day.name}</div>
+          <div class="day-focus">${day.focus}</div>
+        </div>
+        <div class="day-badge ${checked ? 'done' : ''}">${checked ? '✅ 已完成' : isToday ? '今日' : day.weekday}</div>
+      </div>`;
+    
+    for (let i = 0; i < (day.exercises || []).length; i++) {
+      const item = day.exercises[i];
+      const ex = exMap[item.exercise_id] || {};
+      html += `<div class="exercise-item">
+        <div class="exercise-num">${i + 1}</div>
+        <div class="exercise-info">
+          <div class="exercise-name">${item.name || ex.name || item.exercise_id}</div>
+          <div class="exercise-detail">${(ex.muscle_groups || []).slice(0,2).join('、')}</div>
+        </div>
+        <div class="exercise-sets">${item.sets}组 × ${item.reps}${item.duration_minutes ? ` · ${item.duration_minutes}分钟` : ''}</div>
+      </div>`;
+    }
+    
+    html += `<button class="checkin-btn ${checked ? 'done' : 'do'}" 
+      onclick="doCheckin(${day.day}, '${day.weekday}')"
+      ${checked ? 'disabled' : ''}>
+      ${checked ? '✅ 今日已完成' : '📌 打卡完成今日训练'}
+    </button></div>`;
+  }
+  
+  container.innerHTML = html;
+}
+
+function renderLibrary() {
+  const container = document.getElementById('tab-library');
+  const catColors = { '胸肌': '#EF4444', '背部': '#3B82F6', '腿部': '#10B981', '肩部': '#8B5CF6', '手臂': '#F59E0B', '核心': '#EC4899', '有氧': '#06B6D4' };
+  
+  let html = `<div class="ex-grid">`;
+  for (const ex of exercises) {
+    const color = catColors[ex.category] || '#64748B';
+    html += `<div class="ex-card" onclick="showExercise('${ex.id}')">
+      <div class="ex-card-name">${ex.name}</div>
+      <div class="ex-card-cat"><span style="background:${color}20;color:${color}">${ex.category}</span></div>
+    </div>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function renderHistory() {
+  const container = document.getElementById('tab-history');
+  const sorted = [...checkins].sort((a, b) => b.date.localeCompare(a.date));
+  
+  if (!sorted.length) {
+    container.innerHTML = '<div class="empty-state"><div class="emoji">📝</div><p>还没有打卡记录<br>完成第一次训练后来这里看看吧</p></div>';
+    return;
+  }
+  
+  const exMap = {};
+  exercises.forEach(ex => exMap[ex.id] = ex);
+  
+  let html = '';
+  for (const log of sorted.slice(0, 30)) {
+    const day = currentPlan?.days?.find(d => d.day === log.day_id);
+    html += `<div class="history-item">
+      <div>
+        <div class="history-date">${log.date}</div>
+        <div class="history-meta">${log.weekday} · ${day?.name || '训练日'}${log.duration_minutes ? ` · ${log.duration_minutes}分钟` : ''}</div>
+      </div>
+      <div class="history-check">✓ 完成</div>
+    </div>`;
+  }
+  
+  container.innerHTML = html;
+}
+
+// ==================== 动作详情 ====================
+function showExercise(id) {
+  const ex = exercises.find(e => e.id === id);
+  if (!ex) return;
+  
+  const catColors = { '胸肌': '#EF4444', '背部': '#3B82F6', '腿部': '#10B981', '肩部': '#8B5CF6', '手臂': '#F59E0B', '核心': '#EC4899', '有氧': '#06B6D4' };
+  const color = catColors[ex.category] || '#64748B';
+  
+  document.getElementById('modal-content').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <h3>${ex.name}</h3>
+    </div>
+    <div class="modal-tag" style="background:${color}20;color:${color}">${ex.category} · ${ex.difficulty}</div>
+    
+    <div class="modal-section">
+      <h4>🧠 动作要领</h4>
+      <p>${ex.instructions}</p>
+    </div>
+    
+    <div class="modal-section">
+      <h4>💪 目标肌群</h4>
+      <p>${(ex.muscle_groups || []).join('、')}</p>
+    </div>
+    
+    <div class="modal-section">
+      <h4>🔧 所需器材</h4>
+      <p>${(ex.equipment || []).join('、')}</p>
+    </div>
+    
+    <div class="modal-section">
+      <h4>✅ 小贴士</h4>
+      <div class="modal-tip">${ex.tips}</div>
+    </div>
+    
+    <div class="modal-section">
+      <h4>⚠️ 常见错误</h4>
+      <p>${(ex.common_mistakes || []).map(m => `· ${m}`).join('<br>')}</p>
+    </div>
+    
+    <button class="modal-close" onclick="closeModal()">关闭</button>
+  `;
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ==================== 打卡 ====================
+async function doCheckin(dayId, weekday) {
+  const btn = document.querySelector(`#day-${dayId} .checkin-btn`);
+  btn.textContent = '⏳ 打卡中...';
+  btn.disabled = true;
+  
+  try {
+    const today = new Date();
+    const entry = {
+      date: today.toISOString().split('T')[0],
+      weekday,
+      day_id: dayId,
+      week: currentPlan?.user?.current_week || 1,
+      timestamp: today.toISOString(),
+      duration_minutes: 0,
+      notes: ''
+    };
+    
+    // 读 → 合并 → 写
+    let logs = await fetchBin(CONFIG.checkinsBinId) || [];
+    // 兼容格式：可能是 {checkins:[]} 或 []
+    if (Array.isArray(logs)) {
+      logs = logs;
+    } else if (logs && Array.isArray(logs.checkins)) {
+      logs = logs.checkins;
+    } else {
+      logs = [];
+    }
+    // 移除今日旧记录
+    logs = logs.filter(l => l.date !== entry.date);
+    logs.push(entry);
+    logs.sort((a, b) => a.date.localeCompare(b.date));
+    
+    await saveBin(CONFIG.checkinsBinId, logs);
+    checkins = logs;
+    
+    renderAll();
+  } catch (e) {
+    showError('打卡失败: ' + e.message);
+    btn.textContent = '📌 打卡完成今日训练';
+    btn.disabled = false;
+  }
+}
+
+// ==================== Tab 切换 ====================
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ==================== 启动 ====================
+loadAll();
+</script>
+</body>
+</html>
