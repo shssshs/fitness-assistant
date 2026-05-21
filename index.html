@@ -226,8 +226,13 @@ async function saveBin(binId, data) {
 // ==================== 数据加载 ====================
 async function loadAll() {
   try {
-    exercises = await fetchBin(CONFIG.exercisesBinId);
-    currentPlan = await fetchBin(CONFIG.plansBinId);
+    const exercisesRecord = await fetchBin(CONFIG.exercisesBinId);
+    exercises = exercisesRecord.exercises || exercisesRecord;
+
+    const plansRecord = await fetchBin(CONFIG.plansBinId);
+    // plans bin 直接是计划对象；exercises bin 外层有 {exercises:[...]} 结构
+    currentPlan = plansRecord;
+
     const rawCheckins = await fetchBin(CONFIG.checkinsBinId) || [];
     // 兼容 {checkins:[]} 或纯数组格式
     checkins = Array.isArray(rawCheckins) ? rawCheckins
